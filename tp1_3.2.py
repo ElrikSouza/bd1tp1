@@ -1,7 +1,6 @@
 # Parser
 
 from itertools import islice
-from pprint import pprint
 
 
 DATASET_PATH = 'amazon-meta.txt'
@@ -25,6 +24,16 @@ class Review:
         self.downloaded = downloaded
         self.avgRating = avgRating
         self.entries = entries
+
+
+class Product:
+    def __init__(self, attribute_map: dict) -> None:
+        self.asin = attribute_map.get('ASIN')
+        self.title = attribute_map.get('title')
+        self.group = attribute_map.get('group')
+        self.salesrank = attribute_map.get('salesrank')
+        self.similar = attribute_map.get('similar')
+        self.review = attribute_map.get('review')
 
 
 def split_product_data_line(line: str):
@@ -54,17 +63,16 @@ def parse_simple_attribute(raw_attribute: str, raw_value):
             return attribute, value
 
 
-def parse_category_entry(category_entry: list[list]):
-    categories = ' '.join(category_entry).split('|')[1:]
-    name_id_pairs = [c[:-1].split('[') for c in categories]
-    category_id_name_map = {id: name for name, id in name_id_pairs}
-    print(category_id_name_map)
+# def parse_category_entry(category_entry: list[list]):
+#     categories = ' '.join(category_entry).split('|')[1:]
+#     name_id_pairs = [c[:-1].split('[') for c in categories]
+#     category_id_name_map = {id: name for name, id in name_id_pairs}
+#     print(category_id_name_map)
 
 
 def parse_raw_product_data(lines: list[str]):
     attribute_map = {}
     reviewEntries = []
-    attribute_map['raw_category_entries'] = []
 
     while len(lines) > 0:
         split_line = split_product_data_line(lines.pop())
@@ -77,17 +85,18 @@ def parse_raw_product_data(lines: list[str]):
 
             case['reviews:', 'total:', total, 'downloaded:', downloaded, 'avg', 'rating:', avgRating]:
                 attribute_map['review'] = Review(
-                    total=total, downloaded=downloaded, avgRating=avgRating, entries=[])
+                    total=total, downloaded=downloaded, avgRating=avgRating, entries=reviewEntries)
 
             case split_line if split_line[0].startswith('|'):
-                attribute_map['raw_category_entries'].append(
-                    parse_category_entry(split_line))
+                # attribute_map['raw_category_entries'].append(
+                #     parse_category_entry(split_line))
+                continue
 
             case [date,  'cutomer:', customerId, 'rating:', rating, 'votes:', votes, 'helpful:',   helpful]:
                 entry = ReviewEntries(date, customerId, rating, votes, helpful)
                 reviewEntries.append(entry)
 
-    return attribute_map
+    return Product(attribute_map)
 
 
 with open(DATASET_PATH, 'r') as dataset:
@@ -95,11 +104,13 @@ with open(DATASET_PATH, 'r') as dataset:
     current_product_lines = []
 
     # skip the first 3 lines
-    for line in islice(dataset.readlines(), 3, None):
+    for line in islice(dataset, 3, None):
 
         if line == '\n':
             if len(current_product_lines) > 0:
-                products.append(parse_raw_product_data(current_product_lines))
+                product = parse_raw_product_data(current_product_lines)
+                products.append(product)
+
             current_product_lines = []
 
         else:
