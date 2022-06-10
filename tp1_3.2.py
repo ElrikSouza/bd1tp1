@@ -7,6 +7,8 @@ import re
 
 DATASET_PATH = 'amazon-meta.txt'
 
+NEXT_PRODUCT_DELIMITER = '\n'
+
 ATTRIBUTES = ["Id:", "categories:", "ASIN:", "title:",
               "group:", "salesrank:", "similar:", "categories:"]
 
@@ -39,6 +41,40 @@ class Product:
         self.categories = attribute_map.get('category_leaves')
 
 
+class Category:
+    def __init__(self, id, parent_category_id, name):
+        self.id = id
+        self.parent_category_id = parent_category_id
+        self.name = name
+
+
+class CategoryHierarchy:
+    def __init__(self) -> None:
+        self.category_tree = Tree()
+
+        # auxiliary node that holds all the category branches together
+        self.category_tree.create_node('sentinel_node', 0)
+
+    def add_category(self, id, name, parent_id):
+        if id not in self.category_tree:
+            self.category_tree.create_node(
+                name, id, parent=parent_id, data=parent_id)
+
+    def _get_node_data(self, node_id) -> Category:
+        node = self.category_tree[node_id]
+
+        return Category(node.identifier, node.data, node.tag)
+
+    def get_width_iterator(self):
+        category_generator = (self._get_node_data(node)
+                              for node in self.category_tree.expand_tree(0, Tree.WIDTH))
+        # skip the sentinel node
+        return islice(category_generator, 1, None)
+
+    def show(self):
+        self.category_tree.show()
+
+
 def split_product_data_line(line: str):
     return [f for f in line.strip().split(' ') if f != '']
 
@@ -59,35 +95,35 @@ def parse_key_value_attribute(raw_attribute: str, raw_value):
             return attribute, ' '.join(value)
 
         case "similar":
-            # remove the length, and return the rest of the similar ids
+            # remove the length, and return the rest of the similar ASINs
             return attribute, value.split(' ')[1:]
 
         case _:
             return attribute, value
 
 
-def parse_categories_and_add_to_the_tree(categories: list[str], gtree: Tree):
-    t = Tree()
-    t.create_node('sentinel', 0)
+def parse_categories_and_add_to_the_tree(categories: list[str], gtree: CategoryHierarchy):
     category_regex = "\|([\w\s\,]*)\[(\d+)\]"
 
     name_id_pairs_seq = [re.findall(category_regex, c) for c in categories]
     leaves = set()
 
     for seq in name_id_pairs_seq:
-        last_id = 0
+        parent_id = 0
         for name, id in seq:
-            if id not in gtree and name != '':
-                gtree.create_node(name, id, parent=last_id, data=last_id)
-            if name != '':
-                last_id = id
+            # skip invalid categories
+            if name == '':
+                continue
+
+            gtree.add_category(id, name, parent_id)
+            parent_id = id
 
         leaves.add(seq[-1][1])
 
     return leaves
 
 
-def parse_raw_product_data(lines: list[str], gtree: Tree):
+def parse_product_lines(lines: list[str], categoryHierarchy: CategoryHierarchy) -> Product:
     attribute_map = {}
     raw_category_entries = []
     reviewEntries = []
@@ -112,31 +148,31 @@ def parse_raw_product_data(lines: list[str], gtree: Tree):
                 entry = ReviewEntries(date, customerId, rating, votes, helpful)
                 reviewEntries.append(entry)
 
-    if len(raw_category_entries):
         attribute_map['category_leaves'] = parse_categories_and_add_to_the_tree(
-            raw_category_entries, gtree)
+            raw_category_entries, categoryHierarchy)
 
     return Product(attribute_map)
 
 
 with open(DATASET_PATH, 'r') as dataset:
-    products = []
+    all_products = []
     current_product_lines = []
-    global_tree = Tree()
-    global_tree.create_node('sentinel', 0)
+
+    category_hierarchy = CategoryHierarchy()
 
     # skip the first 3 lines
     for line in islice(dataset, 3, None):
 
-        if line == '\n':
+        if line == NEXT_PRODUCT_DELIMITER:
             if len(current_product_lines) > 0:
-                product = parse_raw_product_data(
-                    current_product_lines, global_tree)
-                products.append(product)
+                product = parse_product_lines(
+                    current_product_lines, category_hierarchy)
+
+                all_products.append(product)
 
             current_product_lines = []
 
         else:
             current_product_lines.append(line)
 
-    global_tree.show()
+    category_hierarchy.show()
