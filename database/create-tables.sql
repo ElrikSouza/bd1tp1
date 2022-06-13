@@ -1,14 +1,14 @@
-CREATE TABLE Group (
+CREATE TABLE group (
   id SERIAL PRIMARY KEY,
 
-  name VARCHAR(100) UNIQUE NOT NULL,
+  name VARCHAR(100) UNIQUE NOT NULL
 );
 
-CREATE TABLE User (
-  id INT PRIMARY KEY,
+CREATE TABLE amazonUser (
+  id INT PRIMARY KEY
 );
 
-CREATE TABLE Category (
+CREATE TABLE category (
   id INT PRIMARY KEY,
 
   categoryIdParent INT,
@@ -17,10 +17,10 @@ CREATE TABLE Category (
   name VARCHAR(100) NOT NULL,
 
   FOREIGN KEY(categoryIdParent) REFERENCES Category (id),
-  FOREIGN KEY(categoryIdChild) REFERENCES Category (id),
+  FOREIGN KEY(categoryIdChild) REFERENCES Category (id)
 );
 
-CREATE TABLE Product (
+CREATE TABLE product (
   asin INT PRIMARY KEY NOT NULL,
 
   groupId INT NOT NULL,
@@ -28,30 +28,30 @@ CREATE TABLE Product (
   title VARCHAR(100) NOT NULL,
   sales_rank INT NOT NULL,
 
-  FOREIGN KEY(groupId) REFERENCES Group (id),
+  FOREIGN KEY(groupId) REFERENCES Group (id)
 );
 
-CREATE TABLE SimilarTo (
+CREATE TABLE similarTo (
   productOriginAsin INT NOT NULL,
   productSimilarAsin INT NOT NULL,
 
   PRIMARY KEY (productOriginAsin, productSimilarAsin)
 
   FOREIGN KEY(productOriginAsin) REFERENCES Product (asin),
-  FOREIGN KEY(productSimilarAsin) REFERENCES Product (asin),
+  FOREIGN KEY(productSimilarAsin) REFERENCES Product (asin)
 );
 
-CREATE TABLE ProductCategory (
+CREATE TABLE productCategory (
   productAsin INT NOT NULL,
   categoryId INT NOT NULL,
 
   PRIMARY KEY (productAsin, categoryId),
 
   FOREIGN KEY(productAsin) REFERENCES Product (asin),
-  FOREIGN KEY(categoryId) REFERENCES Category (id),
+  FOREIGN KEY(categoryId) REFERENCES Category (id)
 );
 
-CREATE TABLE Review (
+CREATE TABLE review (
   productAsin INT NOT NULL,
   userId INT NOT NULL,
 
@@ -63,5 +63,5 @@ CREATE TABLE Review (
   PRIMARY KEY (productAsin, userId),
 
   FOREIGN KEY(productAsin) REFERENCES Product (asin),
-  FOREIGN KEY(userId) REFERENCES Category (id),
+  FOREIGN KEY(userId) REFERENCES Category (id)
 );
