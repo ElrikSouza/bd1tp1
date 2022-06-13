@@ -13,3 +13,20 @@ sh open-diagram.sh
 O hash que monta o diagrama está versionado em `docs/diagram-hash.txt`.
 
 Os símbolos que representam as cardinalidades podem ser vistos [aqui](https://plantuml.com/ie-diagram)
+
+## Containers
+
+Iniciar os serviços:
+```bash
+docker-compose up -d
+```
+
+Parar os serviços:
+```bash
+docker-compose stop
+```
+
+Iniciar os serviços:
+```bash
+docker-compose down
+```
