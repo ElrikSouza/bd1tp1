@@ -15,7 +15,7 @@ CREATE TABLE category (
 
   name VARCHAR(100) NOT NULL,
 
-  FOREIGN KEY(category_id_parent) REFERENCES category(id),
+  FOREIGN KEY(category_id_parent) REFERENCES category(id)
 );
 
 CREATE TABLE product (
