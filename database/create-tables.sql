@@ -1,68 +1,66 @@
-CREATE TABLE group (
+CREATE TABLE product_group (
   id SERIAL PRIMARY KEY,
 
-  name VARCHAR(100) UNIQUE NOT NULL
+  name VARCHAR(15) UNIQUE NOT NULL
 );
 
-CREATE TABLE amazonUser (
+CREATE TABLE amazon_user (
   id INT PRIMARY KEY
 );
 
 CREATE TABLE category (
   id INT PRIMARY KEY,
 
-  categoryIdParent INT,
-  categoryIdChild INT,
+  category_id_parent INT,
 
   name VARCHAR(100) NOT NULL,
 
-  FOREIGN KEY(categoryIdParent) REFERENCES Category (id),
-  FOREIGN KEY(categoryIdChild) REFERENCES Category (id)
+  FOREIGN KEY(category_id_parent) REFERENCES category(id),
 );
 
 CREATE TABLE product (
   asin INT PRIMARY KEY NOT NULL,
 
-  groupId INT NOT NULL,
+  product_group_id INT NOT NULL,
 
   title VARCHAR(100) NOT NULL,
   sales_rank INT NOT NULL,
 
-  FOREIGN KEY(groupId) REFERENCES Group (id)
+  FOREIGN KEY(product_group_id) REFERENCES product_group(id)
 );
 
-CREATE TABLE similarTo (
-  productOriginAsin INT NOT NULL,
-  productSimilarAsin INT NOT NULL,
+CREATE TABLE similar_to (
+  product_origin_asin INT NOT NULL,
+  product_similar_asin INT NOT NULL,
 
-  PRIMARY KEY (productOriginAsin, productSimilarAsin)
+  PRIMARY KEY (product_origin_asin, product_similar_asin),
 
-  FOREIGN KEY(productOriginAsin) REFERENCES Product (asin),
-  FOREIGN KEY(productSimilarAsin) REFERENCES Product (asin)
+  FOREIGN KEY(product_origin_asin) REFERENCES product(asin),
+  FOREIGN KEY(product_similar_asin) REFERENCES product(asin)
 );
 
-CREATE TABLE productCategory (
-  productAsin INT NOT NULL,
-  categoryId INT NOT NULL,
+CREATE TABLE product_category (
+  product_asin INT NOT NULL,
+  category_id INT NOT NULL,
 
-  PRIMARY KEY (productAsin, categoryId),
+  PRIMARY KEY (product_asin, category_id),
 
-  FOREIGN KEY(productAsin) REFERENCES Product (asin),
-  FOREIGN KEY(categoryId) REFERENCES Category (id)
+  FOREIGN KEY(product_asin) REFERENCES product(asin),
+  FOREIGN KEY(category_id) REFERENCES category(id)
 );
 
 CREATE TABLE review (
-  productAsin INT NOT NULL,
-  userId INT NOT NULL,
+  product_asin INT NOT NULL,
+  user_id INT NOT NULL,
 
   helpful INT,
   votes INT,
   rating INT,
 
-  reviewedAt DATE NOT NULL,
+  reviewed_at DATE NOT NULL,
 
-  PRIMARY KEY (productAsin, userId),
+  PRIMARY KEY (product_asin, user_id),
 
-  FOREIGN KEY(productAsin) REFERENCES Product (asin),
-  FOREIGN KEY(userId) REFERENCES Category (id)
+  FOREIGN KEY(product_asin) REFERENCES product(asin),
+  FOREIGN KEY(user_id) REFERENCES amazon_user(id)
 );
