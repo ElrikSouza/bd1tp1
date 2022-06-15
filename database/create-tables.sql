@@ -55,10 +55,11 @@ CREATE TABLE review (
   productAsin INT NOT NULL,
   userId INT NOT NULL,
 
-  date DATE NOT NULL,
   helpful INT,
   votes INT,
   rating INT,
+
+  reviewedAt DATE NOT NULL,
 
   PRIMARY KEY (productAsin, userId),
 
