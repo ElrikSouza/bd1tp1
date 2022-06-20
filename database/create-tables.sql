@@ -5,7 +5,7 @@ CREATE TABLE product_group (
 );
 
 CREATE TABLE amazon_user (
-  id INT PRIMARY KEY
+  id VARCHAR(15) PRIMARY KEY
 );
 
 CREATE TABLE category (
@@ -19,19 +19,19 @@ CREATE TABLE category (
 );
 
 CREATE TABLE product (
-  asin INT PRIMARY KEY NOT NULL,
+  asin VARCHAR(15) PRIMARY KEY NOT NULL,
 
-  product_group_id INT NOT NULL,
+  product_group_id INT,
 
-  title VARCHAR(100) NOT NULL,
-  sales_rank INT NOT NULL,
+  title VARCHAR(500),
+  sales_rank INT,
 
   FOREIGN KEY(product_group_id) REFERENCES product_group(id)
 );
 
 CREATE TABLE similar_to (
-  product_origin_asin INT NOT NULL,
-  product_similar_asin INT NOT NULL,
+  product_origin_asin VARCHAR(15) NOT NULL,
+  product_similar_asin VARCHAR(15) NOT NULL,
 
   PRIMARY KEY (product_origin_asin, product_similar_asin),
 
@@ -40,7 +40,7 @@ CREATE TABLE similar_to (
 );
 
 CREATE TABLE product_category (
-  product_asin INT NOT NULL,
+  product_asin VARCHAR(15) NOT NULL,
   category_id INT NOT NULL,
 
   PRIMARY KEY (product_asin, category_id),
@@ -50,16 +50,15 @@ CREATE TABLE product_category (
 );
 
 CREATE TABLE review (
-  product_asin INT NOT NULL,
-  user_id INT NOT NULL,
+  id serial primary key,
+  product_asin VARCHAR(15) NOT NULL,
+  user_id VARCHAR(15) NOT NULL,
 
   helpful INT,
   votes INT,
   rating INT,
 
   reviewed_at DATE NOT NULL,
-
-  PRIMARY KEY (product_asin, user_id),
 
   FOREIGN KEY(product_asin) REFERENCES product(asin),
   FOREIGN KEY(user_id) REFERENCES amazon_user(id)

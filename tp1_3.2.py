@@ -1,178 +1,188 @@
 # Parser
 
-from itertools import islice
-from treelib import Tree
-import re
+
+import psycopg2
+from psycopg2.extras import execute_batch
+from parser import *
+from entities import *
 
 
-DATASET_PATH = 'amazon-meta.txt'
+class DatabaseSeeder:
+    def __init__(self, connection_string: str) -> None:
+        self.conn = self._get_pgsql_connection(connection_string)
 
-NEXT_PRODUCT_DELIMITER = '\n'
+    def _get_pgsql_connection(self, connection_string: str):
+        conn = psycopg2.connect(connection_string)
 
-ATTRIBUTES = ["Id:", "categories:", "ASIN:", "title:",
-              "group:", "salesrank:", "similar:", "categories:"]
+        return conn
+
+    def _destroy_database_schema(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute('''
+        DROP TABLE IF EXISTS product_group CASCADE;
+        DROP TABLE IF EXISTS amazon_user CASCADE;
+        DROP TABLE IF EXISTS category CASCADE;
+        DROP TABLE IF EXISTS product CASCADE;
+        DROP TABLE IF EXISTS similar_to CASCADE;
+        DROP TABLE IF EXISTS product_category CASCADE;
+        DROP TABLE IF EXISTS review CASCADE;
+        ''')
+
+        self.conn.commit()
+        cursor.close()
+
+    def _load_database_schema(self) -> str:
+        database_schema = []
+
+        with open('database/create-tables.sql', 'r') as sql_file:
+            database_schema = ' '.join(sql_file.readlines())
+
+        return database_schema
+
+    def _create_tables(self):
+        cursor = self.conn.cursor()
+
+        database_schema = self._load_database_schema()
+        cursor.execute(database_schema)
+
+        self.conn.commit()
+        cursor.close()
+
+    def _populate_categories_table(self, categories_iterator):
+        print('[AVISO] Inserindo categorias')
+
+        curr = self.conn.cursor()
+        curr.execute('delete from category;')
+
+        execute_batch(curr, '''
+        insert into category (id, category_id_parent, name)
+        values (%(id)s,%(parent_category_id)s,%(name)s)
+        ''', categories_iterator, page_size=1000)
+
+        self.conn.commit()
+        curr.close()
+
+    def _populate_product_group_table(self, product_groups_dict):
+        print('[AVISO] Inserindo grupos de produtos')
+
+        curr = self.conn.cursor()
+
+        execute_batch(curr, '''
+                INSERT INTO product_group(id, name) values
+                (%s, %s)
+            ''', ([id, name] for name, id in product_groups_dict.items()))
+
+        self.conn.commit()
+        curr.close()
+
+    def _populate_amazon_users_table(self, user_ids):
+        print('[AVISO] Inserindo usuarios')
+
+        curr = self.conn.cursor()
+
+        execute_batch(curr, '''
+                INSERT INTO amazon_user(id) values
+                (%s)
+            ''', [[user_id] for user_id in user_ids], page_size=2000)
+
+        self.conn.commit()
+        curr.close()
+
+    def _populate_product_table(self, products: list[Product]):
+        print('[AVISO] Inserindo produtos')
+
+        curr = self.conn.cursor()
+
+        execute_batch(curr, '''
+            INSERT INTO product(asin, product_group_id, title, sales_rank) values
+            (%(asin)s,%(group)s,%(title)s, %(salesrank)s)
+            ''', products, page_size=2000)
+
+        self.conn.commit()
+        curr.close()
+
+    def _populate_similar_to_table(self, similar_to_pairs: list, product_asin_set):
+        print('[AVISO] Inserindo tabela de produtos similares')
+
+        curr = self.conn.cursor()
+
+        similar_pairs_generator = ([the_product_id, similar_product_id] for the_product_id,
+                                   similar_product_id in similar_to_pairs if similar_product_id in product_asin_set)
+
+        execute_batch(curr, '''
+            INSERT INTO similar_to(product_origin_asin, product_similar_asin) values
+                    (%s, %s)
+        ''', similar_pairs_generator, page_size=2000)
+
+        self.conn.commit()
+        curr.close()
+
+    def _populate_product_leaf_category_table(self, asin_leaf_tuples):
+        print('[AVISO] Inserindo folhas de categorias/asin')
+
+        curr = self.conn.cursor()
+
+        execute_batch(curr, '''
+            INSERT INTO product_category(product_asin, category_id) values (%s,%s)
+        ''', asin_leaf_tuples, page_size=2000)
+
+        self.conn.commit()
+        curr.close()
+
+        return
+
+    def _populate_review_entries_table(self, asin_review_entries_tuples):
+
+        curr = self.conn.cursor()
+
+        asin_entry_gen = ((asin, review_entries)
+                          for asin, review_entries in asin_review_entries_tuples)
+
+        # a = (self._q(asin, review_entry) for asin, review_entry in ((asin, review_entry) in ))
+
+        for asin, review_entries in asin_review_entries_tuples:
+            for review_entry in review_entries:
+                queryArgs = [asin, review_entry.customerId,
+                             review_entry.helpful, review_entry.votes, review_entry.rating, review_entry.date]
+
+                curr.execute('''
+                    INSERT INTO review(product_asin,  user_id, helpful, votes, rating, reviewed_at)
+                    VALUES
+                    (%s, %s, %s, %s, %s, %s);
+                ''', queryArgs)
+
+        self.conn.commit()
+        curr.close()
+
+    def populate_database(self, dataset: Dataset):
+        self._destroy_database_schema()
+        self._create_tables()
+
+        categories = dataset.category_hiearchy.get_width_iterator()
+        self._populate_categories_table(categories)
+
+        self._populate_product_group_table(dataset.product_group_dict)
+
+        self._populate_amazon_users_table(list(dataset.amazon_users))
+
+        self._populate_product_table(dataset.products)
+
+        self._populate_product_leaf_category_table(
+            dataset.get_product_asin_leaf_category_tuples())
+
+        self._populate_similar_to_table(dataset.get_similar_to_pairs(), set(
+            [product.asin for product in dataset.products]))
+
+        # self._populate_review_entries_table(
+        #     dataset.get_product_asin_review_entries_tuples())
 
 
-class ReviewEntries:
-    def __init__(self, date, customerId, rating, votes, helpful) -> None:
-        self.date = date
-        self.customerId = customerId
-        self.rating = rating
-        self.votes = votes
-        self.helpful = helpful
+conn_string = 'user=postgres password=db host=localhost port=1999 dbname=bdtp1'
+print('[AVISO] Lendo dados')
+dataset = DatabaseParser().load_dataset()
+print('[AVISO] Dados lidos')
+seeder = DatabaseSeeder(conn_string)
+seeder.populate_database(dataset)
 
-
-class Review:
-    def __init__(self, total, downloaded, avgRating, entries: list[ReviewEntries]) -> None:
-        self.total = total
-        self.downloaded = downloaded
-        self.avgRating = avgRating
-        self.entries = entries
-
-
-class Product:
-    def __init__(self, attribute_map: dict) -> None:
-        self.asin = attribute_map.get('ASIN')
-        self.title = attribute_map.get('title')
-        self.group = attribute_map.get('group')
-        self.salesrank = attribute_map.get('salesrank')
-        self.similar = attribute_map.get('similar')
-        self.review = attribute_map.get('review')
-        self.categories = attribute_map.get('category_leaves')
-
-
-class Category:
-    def __init__(self, id, parent_category_id, name):
-        self.id = id
-        self.parent_category_id = parent_category_id
-        self.name = name
-
-
-class CategoryHierarchy:
-    def __init__(self) -> None:
-        self.category_tree = Tree()
-
-        # auxiliary node that holds all the category branches together
-        self.category_tree.create_node('sentinel_node', 0)
-
-    def add_category(self, id, name, parent_id):
-        if id not in self.category_tree:
-            self.category_tree.create_node(
-                name, id, parent=parent_id, data=parent_id)
-
-    def _get_node_data(self, node_id) -> Category:
-        node = self.category_tree[node_id]
-
-        return Category(node.identifier, node.data, node.tag)
-
-    def get_width_iterator(self):
-        category_generator = (self._get_node_data(node)
-                              for node in self.category_tree.expand_tree(0, Tree.WIDTH))
-        # skip the sentinel node
-        return islice(category_generator, 1, None)
-
-    def show(self):
-        self.category_tree.show()
-
-
-def split_product_data_line(line: str):
-    return [f for f in line.strip().split(' ') if f != '']
-
-
-def parse_key_value_attribute(raw_attribute: str, raw_value):
-    attribute = raw_attribute.strip()[:-1]
-    value = raw_value.strip()
-
-    match attribute:
-        # attributes that have int values
-        case "Id" | "categories" | "salesrank":
-            return attribute, int(value)
-
-        case "ASIN":
-            return attribute, value
-
-        case "title":
-            return attribute, ' '.join(value)
-
-        case "similar":
-            # remove the length, and return the rest of the similar ASINs
-            return attribute, value.split(' ')[1:]
-
-        case _:
-            return attribute, value
-
-
-def parse_categories_and_add_to_the_tree(categories: list[str], gtree: CategoryHierarchy):
-    category_regex = "\|([\w\s\,]*)\[(\d+)\]"
-
-    name_id_pairs_seq = [re.findall(category_regex, c) for c in categories]
-    leaves = set()
-
-    for seq in name_id_pairs_seq:
-        parent_id = 0
-        for name, id in seq:
-            # skip invalid categories
-            if name == '':
-                continue
-
-            gtree.add_category(id, name, parent_id)
-            parent_id = id
-
-        leaves.add(seq[-1][1])
-
-    return leaves
-
-
-def parse_product_lines(lines: list[str], categoryHierarchy: CategoryHierarchy) -> Product:
-    attribute_map = {}
-    raw_category_entries = []
-    reviewEntries = []
-
-    while len(lines) > 0:
-        split_line = split_product_data_line(lines.pop())
-
-        match split_line:
-            case[attribute, *value] if attribute in ATTRIBUTES:
-                parsed_attribute, parsed_value = parse_key_value_attribute(
-                    attribute, ' '.join(value))
-                attribute_map[parsed_attribute] = parsed_value
-
-            case['reviews:', 'total:', total, 'downloaded:', downloaded, 'avg', 'rating:', avgRating]:
-                attribute_map['review'] = Review(
-                    total=total, downloaded=downloaded, avgRating=avgRating, entries=reviewEntries)
-
-            case split_line if split_line[0].startswith('|'):
-                raw_category_entries.append(' '.join(split_line))
-
-            case [date,  'cutomer:', customerId, 'rating:', rating, 'votes:', votes, 'helpful:',   helpful]:
-                entry = ReviewEntries(date, customerId, rating, votes, helpful)
-                reviewEntries.append(entry)
-
-        attribute_map['category_leaves'] = parse_categories_and_add_to_the_tree(
-            raw_category_entries, categoryHierarchy)
-
-    return Product(attribute_map)
-
-
-with open(DATASET_PATH, 'r') as dataset:
-    all_products = []
-    current_product_lines = []
-
-    category_hierarchy = CategoryHierarchy()
-
-    # skip the first 3 lines
-    for line in islice(dataset, 3, None):
-
-        if line == NEXT_PRODUCT_DELIMITER:
-            if len(current_product_lines) > 0:
-                product = parse_product_lines(
-                    current_product_lines, category_hierarchy)
-
-                all_products.append(product)
-
-            current_product_lines = []
-
-        else:
-            current_product_lines.append(line)
-
-    category_hierarchy.show()
+# print([s for s in dataset.get_similar_to_pairs()])
