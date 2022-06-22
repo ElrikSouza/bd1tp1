@@ -1,6 +1,6 @@
 # Parser
 
-
+from distutils.util import execute
 import psycopg2
 from psycopg2.extras import execute_batch
 from parser import *
@@ -27,6 +27,7 @@ class DatabaseSeeder:
         DROP TABLE IF EXISTS similar_to CASCADE;
         DROP TABLE IF EXISTS product_category CASCADE;
         DROP TABLE IF EXISTS review CASCADE;
+        DROP TABLE IF EXISTS product_reviews_statistics CASCADE;
         ''')
 
         self.conn.commit()
@@ -132,25 +133,38 @@ class DatabaseSeeder:
 
         return
 
+    def a(self, asin, entries):
+        return ([asin, review_entry.customerId,
+                 review_entry.helpful, review_entry.votes, review_entry.rating, review_entry.date] for review_entry in entries)
+
     def _populate_review_entries_table(self, asin_review_entries_tuples):
+        print('[AVISO] Inserindo reviews (vai demorar)')
 
         curr = self.conn.cursor()
 
-        asin_entry_gen = ((asin, review_entries)
-                          for asin, review_entries in asin_review_entries_tuples)
+        asin_entry_gen = chain.from_iterable(
+            (self.a(asin, review_entries) for asin, review_entries in asin_review_entries_tuples))
 
         # a = (self._q(asin, review_entry) for asin, review_entry in ((asin, review_entry) in ))
 
-        for asin, review_entries in asin_review_entries_tuples:
-            for review_entry in review_entries:
-                queryArgs = [asin, review_entry.customerId,
-                             review_entry.helpful, review_entry.votes, review_entry.rating, review_entry.date]
-
-                curr.execute('''
-                    INSERT INTO review(product_asin,  user_id, helpful, votes, rating, reviewed_at)
+        execute_batch(curr, '''
+                            INSERT INTO review(product_asin,  user_id, helpful, votes, rating, reviewed_at)
                     VALUES
                     (%s, %s, %s, %s, %s, %s);
-                ''', queryArgs)
+        ''', asin_entry_gen, page_size=5000)
+
+        self.conn.commit()
+        curr.close()
+
+    def _populate_review_metadata_table(self, reviews):
+        print('[AVISO] Inserindo metadados de reviews')
+
+        curr = self.conn.cursor()
+
+        execute_batch(curr, '''
+            INSERT INTO product_reviews_statistics(product_asin, total, downloaded, avg_rating) VALUES
+            (%(asin)s, %(total)s, %(downloaded)s, %(avgRating)s)
+        ''', reviews, page_size=5000)
 
         self.conn.commit()
         curr.close()
@@ -174,8 +188,11 @@ class DatabaseSeeder:
         self._populate_similar_to_table(dataset.get_similar_to_pairs(), set(
             [product.asin for product in dataset.products]))
 
-        # self._populate_review_entries_table(
-        #     dataset.get_product_asin_review_entries_tuples())
+        self._populate_review_entries_table(
+            dataset.get_product_asin_review_entries_tuples())
+
+        self._populate_review_metadata_table(
+            dataset.get_review_metadata_list())
 
 
 conn_string = 'user=postgres password=db host=localhost port=1999 dbname=bdtp1'
@@ -184,5 +201,4 @@ dataset = DatabaseParser().load_dataset()
 print('[AVISO] Dados lidos')
 seeder = DatabaseSeeder(conn_string)
 seeder.populate_database(dataset)
-
-# print([s for s in dataset.get_similar_to_pairs()])
+print('Os dados foram armazenados com sucesso')

@@ -70,7 +70,7 @@ CREATE TABLE product_reviews_statistics (
   product_asin VARCHAR(15) NOT NULL,
 
   total INT,
-  dowloaded INT,
+  downloaded INT,
   avg_rating FLOAT,
 
   FOREIGN KEY(product_asin) REFERENCES product(asin)

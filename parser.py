@@ -116,6 +116,9 @@ class Dataset:
     def get_product_asin_leaf_category_tuples(self):
         return chain.from_iterable((product.get_asin_leaf_category_tuples() for product in self.products))
 
+    def get_review_metadata_list(self):
+        return (product.review for product in self.products if product.review != None)
+
 
 class DatabaseParser:
     def __init__(self) -> None:

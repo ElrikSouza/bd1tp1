@@ -19,6 +19,10 @@ class Review(Subscriptable):
         self.downloaded = downloaded
         self.avgRating = avgRating
         self.entries = entries
+        self.asin = None
+
+    def set_product_asin(self, asin):
+        self.asin = asin
 
 
 class Product(Subscriptable):
@@ -31,6 +35,9 @@ class Product(Subscriptable):
         self.similar = attribute_map.get('similar')
         self.review = attribute_map.get('review')
         self.categories = attribute_map.get('category_leaves')
+
+        if self.review != None:
+            self.review.set_product_asin(self.asin)
 
     def get_asin_leaf_category_tuples(self):
         return ((self.asin, category_id) for category_id in self.categories)
