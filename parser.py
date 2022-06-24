@@ -89,9 +89,8 @@ class Dataset:
         if product.group != None:
             product.group = self.product_group_dict[product.group]
 
-        if product.review != None:
-            for review_entry in product.review.entries:
-                self.amazon_users.add(review_entry.customerId)
+        for review_entry in product.review_entries:
+            self.amazon_users.add(review_entry.customerId)
 
     def add_category(self, id, name, parent_id):
         self.category_hiearchy.add_category(id, name, parent_id)
@@ -100,10 +99,10 @@ class Dataset:
         '''Returns a generator of tuples containing the product asin and the review entries of that product'''
 
         products_with_reviews = (
-            product for product in self.products if product.review != None)
+            product for product in self.products if len(product.review_entries) != 0)
 
         asin_entries_tuples_list_generator = (
-            (product.asin, product.review.entries) for product in products_with_reviews)
+            (product.asin, product.review_entries) for product in products_with_reviews)
 
         return asin_entries_tuples_list_generator
 
@@ -115,9 +114,6 @@ class Dataset:
 
     def get_product_asin_leaf_category_tuples(self):
         return chain.from_iterable((product.get_asin_leaf_category_tuples() for product in self.products))
-
-    def get_review_metadata_list(self):
-        return (product.review for product in self.products if product.review != None)
 
 
 class DatabaseParser:
@@ -160,10 +156,6 @@ class DatabaseParser:
                         attribute, ' '.join(value))
                     attribute_map[parsed_attribute] = parsed_value
 
-                case['reviews:', 'total:', total, 'downloaded:', downloaded, 'avg', 'rating:', avgRating]:
-                    attribute_map['review'] = Review(
-                        total=int(total), downloaded=int(downloaded), avgRating=float(avgRating), entries=reviewEntries)
-
                 case split_line if split_line[0].startswith('|'):
                     raw_category_entries.append(' '.join(split_line))
 
@@ -174,6 +166,8 @@ class DatabaseParser:
 
             attribute_map['category_leaves'] = self._parse_categories_and_add_to_the_tree(
                 raw_category_entries)
+
+            attribute_map['review_entries'] = reviewEntries
 
         return Product(attribute_map)
 

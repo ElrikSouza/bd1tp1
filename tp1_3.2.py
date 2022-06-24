@@ -1,6 +1,5 @@
 # Parser
 
-from distutils.util import execute
 import psycopg2
 from psycopg2.extras import execute_batch
 from parser import *
@@ -24,10 +23,9 @@ class DatabaseSeeder:
         DROP TABLE IF EXISTS amazon_user CASCADE;
         DROP TABLE IF EXISTS category CASCADE;
         DROP TABLE IF EXISTS product CASCADE;
+        DROP TABLE IF EXISTS review CASCADE;
         DROP TABLE IF EXISTS similar_to CASCADE;
         DROP TABLE IF EXISTS product_category CASCADE;
-        DROP TABLE IF EXISTS review CASCADE;
-        DROP TABLE IF EXISTS product_reviews_statistics CASCADE;
         ''')
 
         self.conn.commit()
@@ -151,20 +149,7 @@ class DatabaseSeeder:
                             INSERT INTO review(product_asin,  user_id, helpful, votes, rating, reviewed_at)
                     VALUES
                     (%s, %s, %s, %s, %s, %s);
-        ''', asin_entry_gen, page_size=5000)
-
-        self.conn.commit()
-        curr.close()
-
-    def _populate_review_metadata_table(self, reviews):
-        print('[AVISO] Inserindo metadados de reviews')
-
-        curr = self.conn.cursor()
-
-        execute_batch(curr, '''
-            INSERT INTO product_reviews_statistics(product_asin, total, downloaded, avg_rating) VALUES
-            (%(asin)s, %(total)s, %(downloaded)s, %(avgRating)s)
-        ''', reviews, page_size=5000)
+        ''', asin_entry_gen, page_size=10000)
 
         self.conn.commit()
         curr.close()
@@ -190,9 +175,6 @@ class DatabaseSeeder:
 
         self._populate_review_entries_table(
             dataset.get_product_asin_review_entries_tuples())
-
-        self._populate_review_metadata_table(
-            dataset.get_review_metadata_list())
 
 
 conn_string = 'user=postgres password=db host=localhost port=1999 dbname=bdtp1'

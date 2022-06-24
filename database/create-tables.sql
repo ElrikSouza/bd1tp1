@@ -63,15 +63,3 @@ CREATE TABLE review (
   FOREIGN KEY(product_asin) REFERENCES product(asin),
   FOREIGN KEY(user_id) REFERENCES amazon_user(id)
 );
-
-CREATE TABLE product_reviews_statistics (
-  id SERIAL PRIMARY KEY,
-  
-  product_asin VARCHAR(15) NOT NULL,
-
-  total INT,
-  downloaded INT,
-  avg_rating FLOAT,
-
-  FOREIGN KEY(product_asin) REFERENCES product(asin)
-);
