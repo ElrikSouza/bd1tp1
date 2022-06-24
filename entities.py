@@ -18,14 +18,14 @@ class Product(Subscriptable):
     __slots__ = ("asin", "title", "group", "salesrank",
                  "similar", "review_entries", "categories")
 
-    def __init__(self, attribute_map: dict) -> None:
-        self.asin = attribute_map.get('ASIN')
-        self.title = attribute_map.get('title')
-        self.group = attribute_map.get('group')
-        self.salesrank = attribute_map.get('salesrank')
-        self.similar = attribute_map.get('similar')
-        self.review_entries = attribute_map.get('review_entries')
-        self.categories = attribute_map.get('category_leaves')
+    def __init__(self) -> None:
+        self.asin = None
+        self.title = None
+        self.group = None
+        self.salesrank = None
+        self.similar = None
+        self.categories = None
+        self.review_entries = []
 
     def get_asin_leaf_category_tuples(self):
         return ((self.asin, category_id) for category_id in self.categories)

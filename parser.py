@@ -7,62 +7,47 @@ DATASET_PATH = 'amazon-meta.txt'
 
 NEXT_PRODUCT_DELIMITER = '\n'
 
-ATTRIBUTES = ["Id:", "categories:", "ASIN:", "title:",
-              "group:", "salesrank:", "similar:", "categories:"]
-
 
 def split_product_data_line(line: str):
-    return [f for f in line.strip().split(' ') if f != '']
+    '''Splits a line every empty space and removes empty strings from the final array'''
 
-
-def parse_key_value_attribute(raw_attribute: str, raw_value):
-    attribute = raw_attribute.strip()[:-1]
-    value = raw_value.strip()
-
-    match attribute:
-        # attributes that have int values
-        case "Id" | "categories" | "salesrank":
-            return attribute, int(value)
-
-        case "ASIN":
-            return attribute, value
-
-        case "title":
-            return attribute, ''.join(value)
-
-        case "similar":
-            # remove the length, and return the rest of the similar ASINs
-            return attribute, value.split(' ')[1:]
-
-        case _:
-            return attribute, value
+    return [line_fragment for line_fragment in line.strip().split(' ') if line_fragment != '']
 
 
 class CategoryHierarchy:
+    '''An abstraction to handle the product categories.'''
+
     def __init__(self) -> None:
-        self.category_tree = Tree()
+        # This tree is used solely to obtain the correct order of insertion
+        self._category_order = Tree()
+
+        # This dictionary holds the actual data since the treelib's iterables don't come with the node's data
+        # and requires searching for the node again to get its content.
+        # It's much faster and the memory overhead is not that noticiable.
+        self._category_data = {}
 
         # auxiliary node that holds all the category branches together
-        self.category_tree.create_node('sentinel_node', 0)
+        self._category_order.create_node('sentinel_node', 0)
+        self._category_data[0] = (None, None)
 
     def add_category(self, id, name, parent_id):
-        if id not in self.category_tree:
-            self.category_tree.create_node(
-                name, id, parent=parent_id, data=parent_id)
+        if id not in self._category_data:
+            self._category_data[id] = (parent_id, name)
+            self._category_order.create_node(identifier=id, parent=parent_id)
 
     def _get_node_data(self, node_id) -> Category:
-        node = self.category_tree[node_id]
+        parent_id, name = self._category_data[node_id]
 
-        return Category(node.identifier, node.data, node.tag)
+        return Category(node_id, parent_id, name)
 
     def get_width_iterator(self):
+        '''Returns a generator that visits all nodes (skipping the sentinel node) by width/bfs order'''
+
         category_generator = (self._get_node_data(node)
-                              for node in self.category_tree.expand_tree(0, Tree.WIDTH))
+                              for node in self._category_order.expand_tree(0, Tree.WIDTH))
+
         # skip the sentinel node
         return islice(category_generator, 1, None)
-
-    def show(self):
-        self.category_tree.show()
 
 
 class Dataset:
@@ -143,33 +128,43 @@ class DatabaseParser:
         return leaves
 
     def _parse_product_lines(self, lines: list[str]) -> Product:
-        attribute_map = {}
         raw_category_entries = []
-        reviewEntries = []
+        product = Product()
 
         while len(lines) > 0:
             split_line = split_product_data_line(lines.pop())
 
             match split_line:
-                case[attribute, *value] if attribute in ATTRIBUTES:
-                    parsed_attribute, parsed_value = parse_key_value_attribute(
-                        attribute, ' '.join(value))
-                    attribute_map[parsed_attribute] = parsed_value
+                case ["ASIN:", asin]:
+                    product.asin = asin
 
+                case ["title:", *split_title]:
+                    title = ' '.join(split_title)
+                    product.title = title
+
+                case ["group:", group]:
+                    product.group = group
+
+                case ["salesrank:", salesrank]:
+                    product.salesrank = int(salesrank)
+
+                case ["similar:", _, *similar_products]:
+                    product.similar = similar_products
+
+                # a line containing a category hieararchy always starts with '|'
                 case split_line if split_line[0].startswith('|'):
-                    raw_category_entries.append(' '.join(split_line))
+                    raw_category = ' '.join(split_line)
+                    raw_category_entries.append(raw_category)
 
-                case [date,  'cutomer:', customerId, 'rating:', rating, 'votes:', votes, 'helpful:',   helpful]:
+                case [date,  'cutomer:', customerId, 'rating:', rating, 'votes:', votes, 'helpful:', helpful]:
                     entry = ReviewEntries(
                         date, customerId, int(rating), int(votes), int(helpful))
-                    reviewEntries.append(entry)
+                    product.review_entries.append(entry)
 
-            attribute_map['category_leaves'] = self._parse_categories_and_add_to_the_tree(
-                raw_category_entries)
+        product.categories = self._parse_categories_and_add_to_the_tree(
+            raw_category_entries)
 
-            attribute_map['review_entries'] = reviewEntries
-
-        return Product(attribute_map)
+        return product
 
     def load_dataset(self) -> Dataset:
 

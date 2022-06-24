@@ -176,6 +176,9 @@ class DatabaseSeeder:
         self._populate_review_entries_table(
             dataset.get_product_asin_review_entries_tuples())
 
+    def close(self):
+        self.conn.close()
+
 
 conn_string = 'user=postgres password=db host=localhost port=1999 dbname=bdtp1'
 print('[AVISO] Lendo dados')
@@ -183,4 +186,5 @@ dataset = DatabaseParser().load_dataset()
 print('[AVISO] Dados lidos')
 seeder = DatabaseSeeder(conn_string)
 seeder.populate_database(dataset)
+seeder.close()
 print('Os dados foram armazenados com sucesso')
