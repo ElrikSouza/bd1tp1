@@ -6,99 +6,155 @@ import sys
 def clear_screen():
     os.system('clear')
 
+def print_searching_data():
+    print('Buscando dados...')
+
 
 class QueryManager:
     def __init__(self, conn):
         self.conn = conn
 
-    def _print_query1_result(self, record):
-        print(f'ID da avaliação: {record[0]}')
-        print(f'ASIN do produto: {record[1]}')
-        print(f'ID do usuário: {record[2]}')
-        print(f'Útil: {record[3]}')
-        print(f'Votos: {record[4]}')
-        print(f'Classificação: {record[5]}')
-        print(f'Data da avaliação: {record[6]}')
-        print('\n')
+    def _print_query1_result(self, reviews, product_asin):
+        for product_title in reviews.keys():
+            print(f'Produto {product_asin}: \'{product_title}\'\n')
+
+            i = 1
+            for review in reviews[product_title]:
+                print(f'\t{i}. Data da avaliação: {review[6]} Usuário {review[2]}')
+                print(f'\t\tÚtil: {review[3]}')
+                print(f'\t\tVotos: {review[4]}')
+                print(f'\t\tClassificação: {review[5]}\n')
+
+                i += 1
+
+            print()
 
     def _query1(self):
+        clear_screen()
+
         print('ASIN do produto:')
         product_asin = input()
 
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
-
             curr.execute('''
-            SELECT *
-            FROM review
-            WHERE product_asin = %s
-            ORDER BY helpful DESC, rating DESC
-            LIMIT 10
-	     ''', (product_asin,))
+                SELECT p.title, p.asin, r.user_id, r.helpful, r.votes, r.rating, r.reviewed_at
+                FROM review r
+                LEFT JOIN product p ON p.asin = r.product_asin
+                WHERE product_asin = %s
+                ORDER BY helpful DESC, rating DESC
+                LIMIT 10
+	        ''', (product_asin,))
+            clear_screen()
 
+            reviews = dict()
             for record in curr:
-                self._print_query1_result(record)
+                if record[0] not in reviews.keys():
+                    reviews[record[0]] = []
 
-    def _print_query2_result(self, record):
-        print(f'ASIN do produto original: {record[0]}')
-        print(f'Título do produto original: {record[1]}')
-        print(f'Classificação das vendas do produto original: {record[2]}')
-        print(f'ASIN do produto similar: {record[3]}')
-        print(f'Título do produto similar: {record[4]}')
-        print(f'Classificação das vendas do produto similar: {record[5]}')
-        print('\n')
+                reviews[record[0]].append(record)
+            
+            self._print_query1_result(reviews, product_asin)
+
+    def _print_query2_result(self, similars, product_asin):
+        for product_title in similars.keys():
+            print(f'Produto {product_asin}: \'{product_title}\'\n')
+
+            i = 1
+            for similar in similars[product_title]:
+                print(f'\t{i}. Produto {similar[4]}: \'{similar[3]}\'')
+                print(f'\t\tRanking das vendas: {similar[5]}\n')
+
+                i += 1
+
+            print()
 
     def _query2(self):
+        clear_screen()
+
         print('ASIN do produto:')
         product_asin = input()
 
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
             curr.execute('''
-                SELECT po.asin AS origin_asin, po.title AS origin_title, po.sales_rank AS origin_sales_rank,
-                ps.asin AS similar_asin, ps.title AS similar_title, ps.sales_rank AS similar_sales_rank
+                SELECT po.title AS origin_title, po.asin AS origin_asin, po.sales_rank AS origin_sales_rank,
+                ps.title AS similar_title, ps.asin AS similar_asin, ps.sales_rank AS similar_sales_rank
                 FROM similar_to st
                 LEFT JOIN product po ON po.asin = st.product_origin_asin
                 LEFT JOIN product ps ON ps.asin = st.product_similar_asin
                 WHERE (st.product_origin_asin = %s) AND (ps.sales_rank < po.sales_rank)
+                ORDER BY ps.sales_rank ASC
             ''', (product_asin,))
+            clear_screen()
 
+            similars = dict()
             for record in curr:
-                self._print_query2_result(record)
+                if record[0] not in similars.keys():
+                    similars[record[0]] = []
 
-    def _print_query3_result(self, record):
-        print(f'Título do produto: {record[0]}')
-        print(f'Data da avaliação: {record[1]}')
-        print(f'Média de avaliação da classificação na data: {record[2]}')
-        print('\n')
+                similars[record[0]].append(record)
+            
+            self._print_query2_result(similars, product_asin)
+
+    def _print_query3_result(self, products, product_asin):
+        for product_title in products.keys():
+            print(f'Produto {product_asin} \'{product_title}\'\n')
+
+            i = 1
+            for product in products[product_title]:
+                print(f'\t{i}. Data: {product[1]}')
+                print(f'\t\tMédia de avaliações: {product[2]}\n')
+
+                i += 1
+            
+            print()
 
     def _query3(self):
+        clear_screen()
+
         print('ASIN do produto:')
         product_asin = input()
 
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
             curr.execute('''
-                SELECT p.title, r.reviewed_at, AVG(r.rating) as rating_avg
+                SELECT p.title, r.reviewed_at, AVG(r.rating) AS rating_avg
                 FROM product p
                 LEFT JOIN review r ON p.asin = r.product_asin
                 WHERE asin = %s
                 GROUP BY p.title, r.reviewed_at
             ''', (product_asin,))
+            clear_screen()
 
+            products = dict()
             for record in curr:
-                self._print_query3_result(record)
+                if record[0] not in products.keys():
+                    products[record[0]] = []
 
-    def _print_query4_result(self, record):
-        print(record)
-        print('\n')
+                products[record[0]].append(record)
+ 
+            self._print_query3_result(products, product_asin)
+
+    def _print_query4_result(self, groups):
+        for group_name in groups.keys():
+            print(f'Grupo {group_name}\n')
+
+            for product in groups[group_name]:
+                print(f'\t{product[4]}. {product[2]} ({product[1]}) - Ranking de venda: {product[3]}')
+            
+            print()
 
     def _query4(self):
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
             curr.execute('''
                 SELECT name, asin, title, sales_rank, ranked_product_group
@@ -106,48 +162,57 @@ class QueryManager:
                 SELECT *, rank() OVER (PARTITION BY product_group_id ORDER BY sales_rank ASC) ranked_product_group
                 FROM product p
                 LEFT JOIN product_group pg ON pg.id = p.product_group_id
-                ) as ranked_products
+                ) AS ranked_products
                 WHERE ranked_product_group <= 10 AND product_group_id IS NOT NULL
                 ORDER BY product_group_id
             ''')
+            clear_screen()
 
+            groups = dict()
             for record in curr:
-                self._print_query4_result(record)
+                if record[0] not in groups.keys():
+                    groups[record[0]] = []
 
-    def _print_query5_result(self, record):
-        print(f'ASIN do produto: {record[0]}')
-        print(f'Título do produto: {record[1]}')
-        print(f'Média de avaliações úteis: {record[2]}')
-        print('\n')
+                groups[record[0]].append(record)
+
+            self._print_query4_result(groups)
+
+    def _print_query5_result(self, record, rank):
+        print(f'{rank}. Produto {record[0]} \'{record[1]}\'\n')
+        print(f'\tMédia de avaliações úteis: {record[2]}\n')
 
     def _query5(self):
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
             curr.execute('''
-                SELECT p.asin, p.title, avg(r.helpful) AS avg_helpful
+                SELECT p.asin, p.title, AVG(r.helpful) AS avg_helpful
                 FROM review r
                 LEFT JOIN product p ON P.asin = r.product_asin
                 GROUP BY p.asin
                 ORDER BY avg_helpful DESC
                 LIMIT 10
             ''')
+            clear_screen()
 
+            i = 1
             for record in curr:
-                self._print_query5_result(record)
+                self._print_query5_result(record, i)
 
-    def _print_query6_result(self, record):
-        print(f'ID da categoria: {record[0]}')
-        print(f'Nome da categoria: {record[1]}')
-        print(f'Média de avaliações úteis: {record[2]}')
-        print('\n')
+                i += 1
+
+    def _print_query6_result(self, record, rank):
+        print(f'{rank}. Categoria {record[0]} \'{record[1]}\'\n')
+        print(f'\tMédia de avaliações úteis: {record[2]}\n')
 
     def _query6(self):
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
             curr.execute('''
-                SELECT c.id, c.name, avg(r.helpful) as avg_helpful
+                SELECT c.id, c.name, AVG(r.helpful) AS avg_helpful
                 FROM review r
                 LEFT JOIN product p ON p.asin = r.product_asin
                 LEFT JOIN product_category pg ON pg.product_asin = p.asin
@@ -156,27 +221,34 @@ class QueryManager:
                 ORDER BY avg_helpful DESC
                 LIMIT 5
             ''')
+            clear_screen()
 
+            i = 1
             for record in curr:
-                self._print_query6_result(record)
+                self._print_query6_result(record, i)
 
-    def _print_query7_result(self, record):
-        print(f'Nome do grupo: {record[0]}')
-        print(f'ID do usuário: {record[1]}')
-        print(f'Quantidade de avaliações: {record[2]}')
-        print(f'Rank: {record[3]}')
-        print('\n')
+                i += 1
+
+    def _print_query7_result(self, groups):
+        for group_name in groups.keys():
+            print(f'Grupo {group_name}\n')
+
+            for review in groups[group_name]:
+                print(f'\t{review[3]}. Usuário {review[1]} - Quantidade de avaliações: {review[2]}')
+        
+            print()
 
     def _query7(self):
         clear_screen()
 
+        print_searching_data()
         with self.conn.cursor() as curr:
             curr.execute('''
                 SELECT name, user_id, reviews, ranked
                 FROM (
                 SELECT *, rank() OVER (PARTITION BY product_group_id ORDER BY reviews DESC) AS ranked
                 FROM (
-                    SELECT pg.name, p.product_group_id, r.user_id, count(r.id) as reviews
+                    SELECT pg.name, p.product_group_id, r.user_id, COUNT(r.id) AS reviews
                     FROM review r
                     LEFT JOIN product p ON r.product_asin = p.asin
                     LEFT JOIN product_group pg ON pg.id = p.product_group_id
@@ -186,9 +258,16 @@ class QueryManager:
                 ) ranked_reviews
                 WHERE ranked <= 10
             ''')
+            clear_screen()
 
+            groups = dict()
             for record in curr:
-                self._print_query7_result(record)
+                if (record[0] not in groups.keys()):
+                    groups[record[0]] = []
+
+                groups[record[0]].append(record)
+
+            self._print_query7_result(groups)
 
     def execute_query(self, selected_query: int):
         if selected_query == 1:
