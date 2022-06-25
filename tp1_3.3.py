@@ -206,6 +206,7 @@ class QueryManager:
         elif selected_query == 7:
             self._query7()
         else:
+            self.conn.close()
             sys.exit()
 
 
