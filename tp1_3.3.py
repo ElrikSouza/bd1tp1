@@ -2,6 +2,8 @@ import psycopg2
 import os
 import sys
 
+from loadenv import load_connection_string_from_env
+
 
 def clear_screen():
     os.system('clear')
@@ -237,7 +239,7 @@ def get_query_option_input():
 
 
 def main_loop():
-    conn_string = 'user=postgres password=db host=localhost port=1999 dbname=bdtp1'
+    conn_string = load_connection_string_from_env()
     conn = psycopg2.connect(conn_string)
     queries = QueryManager(conn)
 

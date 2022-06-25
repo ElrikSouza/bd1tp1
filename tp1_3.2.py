@@ -2,9 +2,9 @@
 
 from parser import DatasetParser
 from seeder import DatabaseSeeder
+from loadenv import load_connection_string_from_env
 
-
-conn_string = 'user=postgres password=db host=localhost port=1999 dbname=bdtp1'
+conn_string = load_connection_string_from_env()
 
 print('[AVISO] Lendo dados')
 dataset = DatasetParser().load_dataset()
