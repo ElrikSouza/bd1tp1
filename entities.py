@@ -4,14 +4,15 @@ class Subscriptable:
 
 
 class ReviewEntries(Subscriptable):
-    __slots__ = ('date', 'customerId', 'rating', 'votes', 'helpful')
+    __slots__ = ('date', 'customerId', 'rating', 'votes', 'helpful', 'asin')
 
-    def __init__(self, date, customerId, rating, votes, helpful) -> None:
+    def __init__(self, date, customerId, rating, votes, helpful, asin) -> None:
         self.date = date
         self.customerId = customerId
         self.rating = rating
         self.votes = votes
         self.helpful = helpful
+        self.asin = asin
 
 
 class Product(Subscriptable):
@@ -28,6 +29,7 @@ class Product(Subscriptable):
         self.review_entries = []
 
     def get_asin_leaf_category_tuples(self):
+        '''Returns a generator of tuples containing the product asin and the id of one leaf category'''
         return ((self.asin, category_id) for category_id in self.categories)
 
 
