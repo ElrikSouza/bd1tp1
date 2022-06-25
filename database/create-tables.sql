@@ -54,9 +54,9 @@ CREATE TABLE review (
   product_asin VARCHAR(15) NOT NULL,
   user_id VARCHAR(15) NOT NULL,
 
-  helpful INT,
-  votes INT,
-  rating INT,
+  helpful INT NOT NULL,
+  votes INT NOT NULL,
+  rating INT NOT NULL,
 
   reviewed_at DATE NOT NULL,
 
