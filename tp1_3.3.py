@@ -192,6 +192,7 @@ class QueryManager:
                 SELECT p.asin, p.title, AVG(r.helpful) AS avg_helpful
                 FROM review r
                 LEFT JOIN product p ON P.asin = r.product_asin
+                WHERE r.helpful > 0
                 GROUP BY p.asin
                 ORDER BY avg_helpful DESC
                 LIMIT 10
@@ -219,6 +220,7 @@ class QueryManager:
                 LEFT JOIN product p ON p.asin = r.product_asin
                 LEFT JOIN product_category pg ON pg.product_asin = p.asin
                 LEFT JOIN category c ON c.id = pg.category_id
+                WHERE r.helpful > 0
                 GROUP BY c.id
                 ORDER BY avg_helpful DESC
                 LIMIT 5
